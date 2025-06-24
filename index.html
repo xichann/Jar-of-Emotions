@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Jar Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind configuration for custom fonts and extended colors.
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        // Base colors for the widget card and text - these remain dynamic via JS
+                        cardBg: 'var(--bg-color)',
+                        defaultText: 'var(--text-color)',
+                        defaultBorder: 'var(--border-color)',
+                        primaryLight: 'var(--primary-bg-light)',
+
+                        // Single Emotion Colors (CSS variables, dynamic based on theme)
+                        // These are used for the mood selection buttons and stars,
+                        // their light/dark variants are handled by getMoodColor
+                        moodJoy: 'var(--color-mood-joy)',
+                        moodLove: 'var(--color-mood-love)',
+                        moodCalm: 'var(--color-mood-calm)',
+                        moodSadness: 'var(--color-mood-sadness)',
+                        moodAnger: 'var(--color-mood-anger)',
+                        moodFear: 'var(--color-mood-fear)',
+                        moodTrust: 'var(--color-mood-trust)',
+                        moodExcitement: 'var(--color-mood-excitement)',
+                        moodGratitude: 'var(--color-mood-gratitude)',
+                        moodAnxiety: 'var(--color-mood-anxiety)',
+                        moodConfidence: 'var(--color-mood-confidence)',
+                        moodHope: 'var(--color-mood-hope)',
+                        moodLoneliness: 'var(--color-mood-loneliness)',
+                        moodPeace: 'var(--color-mood-peace)',
+                        moodEmpty: 'var(--color-mood-empty)',
+                        moodIrritated: 'var(--color-mood-irritated)',
+
+                        // Jar/Star specific colors - these will ONLY be set by applyJarTheme function
+                        // No default values here in CSS, they are fully controlled by JS theme selection
+                        jarBorder: 'var(--color-jarBorder)',
+                        jarText: 'var(--color-jarText)',
+                        jarHeaderBg: 'var(--color-jarHeaderBg)',
+                        jarHeaderBtn: 'var(--color-jarHeaderBtn)',
+                        starHoverGlow: 'var(--color-starHoverGlow)',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Font - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Google Font - Dancing Script for cursive quote -->
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for settings icon and plus sign -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Base styles for the body */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0; /* Removed padding.5rem to make it tightly wrap */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Keep min-height for vertical centering, but background is transparent */
+            background-color: transparent; /* Removed outer background color */
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for theme change */
+        }
+
+        /* --- Theme Colors (CSS Variables) --- */
+        /* Default Light Theme */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+            --primary-bg-light: #f3f4f6;
+
+            /* Single Emotion Pastel Colors (Light Mode) */
+            --color-mood-joy: #FFF5B7;
+            --color-mood-love: #FFD1DC;
+            --color-mood-calm: #D2EBF5;
+            --color-mood-sadness: #B3DDF2;
+            --color-mood-anger: #F7B2A1;
+            --color-mood-fear: #E0D3F5;
+            --color-mood-trust: #C8F4C6;
+            --color-mood-excitement: #FFD9B3;
+            --color-mood-gratitude: #FFDAC1;
+            --color-mood-anxiety: #D8CDEB;
+            --color-mood-confidence: #DCC6E0;
+            --color-mood-hope: #E3F5C4;
+            --color-mood-loneliness: #E6B7C8;
+            --color-mood-peace: #B5EAD7;
+            --color-mood-empty: #E0E0EB;
+            --color-mood-irritated: #E6B8A2;
+
+            /* Star specific colors - these still have light/dark defaults */
+            --color-starHoverGlow: rgba(59, 130, 246, 0.4); /* Blue glow */
+            --color-starDefaultGlow: rgba(0, 0, 0, 0.1); /* Subtle default glow for light mode */
+        }
+
+        /* Dark Mode Theme */
+        body.dark-mode {
+            --bg-color: #1f2937;
+            --text-color: #e5e7eb;
+            --border-color: #374151;
+            --primary-bg-light: #374151;
+
+            /* Single Emotion Pastel Colors (Dark Mode - "Shine Bright") */
+            --color-mood-joy: #FBE675; /* Brighter yellow */
+            --color-mood-love: #FF99AA; /* Brighter pink */
+            --color-mood-calm: #9ADAF2; /* Brighter blue */
+            --color-mood-sadness: #80C8E6; /* Brighter baby blue */
+            --color-mood-anger: #F58C73; /* Brighter coral */
+            --color-mood-fear: #C7B5EB; /* Brighter purple */
+            --color-mood-trust: #8FE88D; /* Brighter mint green */
+            --color-mood-excitement: #FFB373; /* Brighter orange */
+            --color-mood-gratitude: #F5B593; /* Brighter peach */
+            --color-mood-anxiety: #B8A9D1; /* Brighter lilac */
+            --color-mood-confidence: #B899C1; /* Brighter lavender */
+            --color-mood-hope: #BFE88F; /* Brighter pistachio */
+            --color-mood-loneliness: #CB8CA1; /* Brighter dusty rose */
+            --color-mood-peace: #85D4BD; /* Brighter aqua */
+            --color-mood-empty: #A1A1B2; /* Slightly desaturated blue-purple for Empty */
+            --color-mood-irritated: #C79F8B; /* Muted reddish-brown for Irritated */
+
+            /* Star specific colors */
+            --color-starHoverGlow: rgba(99, 102, 241, 0.2); /* Muted glow for hover in dark mode */
+            --color-starDefaultGlow: rgba(99, 102, 241, 0.9); /* EVEN Brighter default glow for dark mode */
+        }
+
+        .bg-card { background-color: var(--bg-color); }
+        .text-default { color: var(--text-color); }
+        .border-default { border-color: var(--border-color); }
+        .bg-primary-light { background-color: var(--primary-bg-light); }
+
+        /* These mood colors are for the selection buttons, and their light/dark versions
+           are directly chosen by getMoodColor function, which uses the theme object. */
+        .mood-color-joy { background-color: var(--color-mood-joy); }
+        .mood-color-love { background-color: var(--color-mood-love); }
+        .mood-color-calm { background-color: var(--color-mood-calm); }
+        .mood-color-sadness { background-color: var(--color-mood-sadness); }
+        .mood-color-anger { background-color: var(--color-mood-anger); }
+        .mood-color-fear { background-color: var(--color-mood-fear); }
+        .mood-color-trust { background-color: var(--color-mood-trust); }
+        .mood-color-excitement { background-color: var(--color-mood-excitement); }
+        .mood-color-gratitude { background-color: var(--color-mood-gratitude); }
+        .mood-color-anxiety { background-color: var(--color-mood-anxiety); }
+        .mood-color-confidence { background-color: var(--color-mood-confidence); }
+        .mood-color-hope { background-color: var(--color-mood-hope); }
+        .mood-color-loneliness { background-color: var(--color-mood-loneliness); }
+        .mood-color-peace { background-color: var(--color-mood-peace); }
+        .mood-color-empty { background-color: var(--color-mood-empty); }
+        .mood-color-irritated { background-color: var(--color-mood-irritated); }
+
+        .mood-selector-button {
+            transition: background-color 0.1s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .mood-selector-button.selected {
+            border: 2px solid var(--color-add-button-bg);
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        #mood-stars-container {
+            position: relative;
+            width: 100%;
+            min-height: 200px; /* Changed height to min-height for flexibility */
+            background: radial-gradient(circle at 50% 120%, var(--primary-bg-light), var(--bg-color) 80%);
+            border-radius: 1.5rem 1.5rem 2rem 2rem / 1.5rem 1.5rem 2.5rem 2.5rem;
+            border: 2px solid var(--color-jarBorder);
+            overflow: hidden;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Flex properties for vertical alignment of stars */
+            flex-direction: column-reverse; /* Stars will stack from bottom up */
+        }
+
+        #jar-cap-container {
+            position: relative;
+            width: 90%;
+            min-height: 40px;
+            background-color: var(--color-cap-bg);
+            border: 2px solid var(--color-cap-border);
+            border-bottom: none;
+            border-radius: 1.25rem 1.25rem 0.5rem 0.5rem / 1.25rem 1.25rem 0.75rem 0.75rem;
+            margin: 0 auto;
+            z-index: 1;
+            box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.1), inset 0 3px 5px rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--color-cap-text);
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+        }
+
+        #jar-cap-text {
+            white-space: normal;
+            font-family: 'Dancing Script', cursive;
+            line-height: 1.3;
+        }
+
+        .star-mood-item {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--color-starDefaultGlow); /* Default glow based on theme */
+            transition: transform 0.3s ease-out, box-shadow 0.3s ease-out, opacity 0.5s ease-out, top 1s ease-out; /* Added top to transition */
+            cursor: pointer;
+            opacity: 0.9;
+            z-index: 1;
+            animation: float 3s ease-in-out infinite; /* Floating animation */
+        }
+
+        /* Dark mode hover: no additional glow, light mode hover: extra glow */
+        body.dark-mode .star-mood-item { /* Added this block for default glow in dark mode */
+            box-shadow: 0 0 8px var(--color-starDefaultGlow),
+                        0 0 15px var(--color-starDefaultGlow),
+                        0 0 20px var(--color-starDefaultGlow); /* Stronger glow in dark mode */
+        }
+        body.dark-mode .star-mood-item:hover {
+            box-shadow: 0 0 5px var(--color-starHoverGlow); /* Muted glow on hover in dark mode */
+            transform: scale(1.1); /* Slightly smaller hover scale for dark mode */
+            opacity: 1;
+        }
+
+        body:not(.dark-mode) .star-mood-item:hover {
+            transform: scale(1.3);
+            box-shadow: 0 0 8px var(--color-starHoverGlow),
+                        0 0 15px var(--color-starHoverGlow),
+                        0 0 20px var(--color-starHoverGlow);
+            z-index: 10;
+            opacity: 1;
+        }
+
+        /* Keyframes for floating animation */
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        /* Tooltip styling */
+        .tooltip {
+            position: absolute;
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            transform: translate(-50%, -120%);
+            left: 50%;
+            top: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .star-mood-item:hover .tooltip {
+            opacity: 1;
+        }
+
+        #add-mood-btn-header {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--color-add-button-bg);
+            color: var(--color-add-button-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+            border: none;
+        }
+
+        #add-mood-btn-header:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 300px;
+            transform: translateY(20px);
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            opacity: 0;
+            position: relative;
+        }
+
+        .modal-overlay.open .modal-content {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: var(--text-color);
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s ease;
+        }
+        .modal-close-btn:hover {
+            background-color: var(--primary-bg-light);
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .mood-selected-confirmation {
+            animation: pop 0.3s ease-out;
+        }
+
+        #clear-mood-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-top: 1rem;
+        }
+
+        #clear-mood-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .color-palette-button {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.1s ease, border-color 0.1s ease;
+        }
+        .color-palette-button.selected-palette {
+            border-color: var(--color-add-button-bg);
+            transform: scale(1.1);
+        }
+
+        /* Brightness effect for stars */
+        .star-recent {
+            opacity: 1;
+            box-shadow: 0 0 8px var(--color-starHoverGlow), 0 0 12px var(--color-starHoverGlow);
+        }
+
+        .star-old {
+            opacity: 0.5; /* Fades out older stars */
+        }
+    </style>
+</head>
+<body class="font-inter antialiased text-default bg-card transition-colors duration-300">
+
+    <div id="app" class="flex flex-col gap-4 p-3 rounded-xl shadow-lg w-full max-w-sm mx-auto my-auto border border-default bg-card">
+        <div class="flex flex-col items-center pb-3 border-b border-default relative">
+            <div class="flex items-center justify-between w-full">
+                <h1 class="text-xl font-bold">Mood Jar Tracker</h1>
+                <div class="flex items-center gap-2">
+                    <button id="add-mood-btn-header" class="text-white shadow-sm">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button id="settings-btn" class="p-1 rounded-full hover:bg-primary-light transition-colors duration-200">
+                        <i class="fas fa-cog text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <span id="header-current-date" class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 self-start"></span>
+        </div>
+
+        <div id="current-mood-display" class="mt-1 text-center text-lg font-bold mood-selected-confirmation">
+        </div>
+
+        <div class="flex flex-col gap-3 relative">
+            <div id="jar-cap-container">
+                <span id="jar-cap-text"></span>
+            </div>
+
+            <div id="mood-stars-container">
+                <p id="empty-jar-message" class="text-default text-center text-sm px-4" style="display: none;">
+                    No moods logged this month.<br>Click '+' to add your first mood!
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between bg-jarHeaderBg p-2 rounded-lg border border-jarBorder mt-2">
+                <button id="prev-month" class="p-1 rounded-md hover:bg-primary-light text-jarHeaderBtn transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    <i class="fas fa-chevron-left text-sm"></i>
+                </button>
+                <h3 id="current-month-year" class="text-base font-semibold text-jarText"></h3>
+                <button id="next-month" class="p-1 rounded-md hover:bg-primary-light text-jarHeaderBtn transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    <i class="fas fa-chevron-right text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Watermark Footer -->
+        <div class="mt-4 pt-2 text-center text-xs text-gray-400 dark:text-gray-600 font-medium tracking-wide" style="letter-spacing: 0.05em; opacity: 0.7;">
+            fromxichan
+        </div>
+    </div>
+
+    <div id="mood-selection-modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="close-mood-modal-btn"><i class="fas fa-times"></i></button>
+            <h3 class="text-lg font-bold mb-4 text-default">Select Today's Mood(s)</h3>
+            <div id="mood-selector-list" class="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2">
+            </div>
+            <div class="flex flex-col gap-2 mt-4">
+                <button id="save-mood-btn" class="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded-md shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-200">
+                    Save Mood(s)
+                </button>
+                <button id="clear-mood-btn" class="w-full py-2 px-4 bg-red-500 text-white font-semibold rounded-md shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition-all duration-200">
+                    Clear Mood for Today
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="close-settings-modal-btn"><i class="fas fa-times"></i></button>
+            <h3 class="text-lg font-bold mb-4 text-default">Settings</h3>
+
+            <div class="flex items-center justify-between mb-4 pb-4 border-b border-default">
+                <span class="text-default font-medium">Dark Mode</span>
+                <button id="toggle-dark-mode" class="p-1 rounded-full hover:bg-primary-light transition-colors duration-200">
+                    <i class="fas fa-sun text-lg dark:hidden"></i>
+                    <i class="fas fa-moon text-lg hidden dark:inline-block"></i>
+                </button>
+            </div>
+
+            <div>
+                <h4 class="text-default font-medium mb-2">Jar Theme</h4>
+                <div id="jar-theme-selector" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playMoodSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+
+            gainNode.gain.exponentialRampToValueAtTime(0.1, audioContext.currentTime + 0.15);
+            gainNode.gain.linearRampToValueAtTime(0.0001, audioContext.currentTime + 0.2);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        const singleMoods = [
+            { id: 'joy', label: 'Joy', color: '#FFF5B7', darkColor: '#FBE675' },
+            { id: 'love', label: 'Love', color: '#FFD1DC', darkColor: '#FF99AA' },
+            { id: 'calm', label: 'Calm', color: '#D2EBF5', darkColor: '#9ADAF2' },
+            { id: 'sadness', label: 'Sadness', color: '#B3DDF2', darkColor: '#80C8E6' },
+            { id: 'anger', label: 'Anger', color: '#F7B2A1', darkColor: '#F58C73' },
+            { id: 'fear', label: 'Fear', color: '#E0D3F5', darkColor: '#C7B5EB' },
+            { id: 'trust', label: 'Trust', color: '#C8F4C6', darkColor: '#8FE88D' },
+            { id: 'excitement', label: 'Excitement', color: '#FFD9B3', darkColor: '#FFB373' },
+            { id: 'gratitude', label: 'Gratitude', color: '#FFDAC1', darkColor: '#F5B593' },
+            { id: 'anxiety', label: 'Anxiety', color: '#D8CDEB', darkColor: '#B8A9D1' },
+            { id: 'confidence', label: 'Confidence', color: '#DCC6E0', darkColor: '#B899C1' },
+            { id: 'hope', label: 'Hope', color: '#E3F5C4', darkColor: '#BFE88F' },
+            { id: 'loneliness', label: 'Loneliness', color: '#E6B7C8', darkColor: '#CB8CA1' },
+            { id: 'peace', label: 'Peace', color: '#B5EAD7', darkColor: '#85D4BD' },
+            { id: 'empty', label: 'Empty', color: '#E0E0EB', darkColor: '#A1A1B2' },
+            { id: 'irritated', label: 'Irritated', color: '#E6B8A2', darkColor: '#C79F8B' }
+        ];
+
+        const allMoods = [...singleMoods];
+
+        const moodQuotes = {
+            'joy': [
+                "May your joy multiply and fill every corner of your day!",
+                "Keep shining! Your happiness is a beacon.",
+                "Embrace this beautiful feeling of joy."
+            ],
+            'love': [
+                "Love is the most powerful force. Feel its warmth.",
+                "May love surround you always.",
+                "Cherish the connections that bring you love."
+            ],
+            'calm': [
+                "Find your peace in the quiet moments.",
+                "A calm mind is a powerful mind.",
+                "Breathe deep, find your center, and be at peace."
+            ],
+            'sadness': [
+                "It's okay to feel sad. Allow yourself time to heal.",
+                "This too shall pass. Brighter days are ahead.",
+                "Your strength is in your vulnerability. Feel, heal, grow."
+            ],
+            'anger': [
+                "Acknowledge your anger, then let it go. Peace awaits.",
+                "Use this energy for positive change.",
+                "Don't let anger consume you. Seek understanding and release."
+            ],
+            'fear': [
+                "Courage is not the absence of fear, but triumph over it.",
+                "You are stronger than your fears. Believe in yourself.",
+                "Step by step, you can overcome anything."
+            ],
+            'trust': [
+                "Trust the process, trust yourself, trust life.",
+                "Building trust takes time, but it's worth it.",
+                "Reliability and faith pave the way."
+            ],
+            'excitement': [
+                "Embrace the thrill! Great things are coming.",
+                "Let your excitement fuel your journey.",
+                "The energy you feel is leading you to something wonderful."
+            ],
+            'gratitude': [
+                "Gratitude turns what we have into enough.",
+                "Count your blessings, big and small.",
+                "A thankful heart is a magnet for miracles."
+            ],
+            'anxiety': [
+                "Take a deep breath. One step at a time.",
+                "You are safe. This feeling will subside.",
+                "Focus on what you can control, let go of what you cannot."
+            ],
+            'confidence': [
+                "Believe in yourself and all that you are.",
+                "Your confidence is your superpower.",
+                "You are capable of amazing things."
+            ],
+            'hope': [
+                "Hope is the light in the darkness. Hold onto it.",
+                "Tomorrow is a new day, full of new possibilities.",
+                "Never give up. Miracles happen every day."
+            ],
+            'loneliness': [
+                "You are not alone, even when it feels that way.",
+                "Reach out, connect. There are people who care.",
+                "Find comfort in self-care and self-love."
+            ],
+            'peace': [
+                "May peace fill your heart and mind.",
+                "Inner peace begins the moment you choose not to allow another person or event to control your emotions.",
+                "Breathe in peace, breathe out worry."
+            ],
+            'empty': [
+                "It's okay to feel nothing sometimes. Allow yourself space.",
+                "Emptiness can be a canvas for new beginnings.",
+                "Even a pause holds its own quiet strength."
+            ],
+            'irritated': [
+                "A small moment of irritation can be overcome with patience.",
+                "Take a moment to reset. This feeling will pass.",
+                "Find a constructive way to release this energy."
+            ],
+            'general': [ // General messages if no specific mood is found or multiple conflicting moods
+                "Your feelings are valid. Take care of yourself today.",
+                "Every day is a chance to start anew.",
+                "You are doing great. Keep going!",
+                "Remember to be kind to yourself.",
+                "A little progress each day adds up to big results."
+            ]
+        };
+
+        function getQuoteForMoods(moodIds) {
+            if (!moodIds || moodIds.length === 0) {
+                return getRandomQuote('general');
+            }
+
+            if (moodIds.length === 1) {
+                const moodId = moodIds[0];
+                if (moodQuotes[moodId]) {
+                    return getRandomQuote(moodId);
+                }
+            }
+
+            for (const moodId of moodIds) {
+                if (moodQuotes[moodId] && moodId !== 'sadness' && moodId !== 'anger' && moodId !== 'fear' && moodId !== 'anxiety' && moodId !== 'loneliness' && moodId !== 'empty' && moodId !== 'irritated') {
+                    return getRandomQuote(moodId);
+                }
+            }
+
+            return getRandomQuote('general');
+        }
+
+        function getRandomQuote(category) {
+            const quotes = moodQuotes[category];
+            if (quotes && quotes.length > 0) {
+                const randomIndex = Math.floor(Math.random() * quotes.length);
+                return quotes[randomIndex];
+            }
+            return moodQuotes['general'][Math.floor(Math.random() * moodQuotes['general'].length)];
+        }
+
+        function hexToRgb(hex) {
+            const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+            hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+                return r + r + g + g + b + b;
+            });
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? [
+                parseInt(result[1], 16),
+                parseInt(result[2], 16),
+                parseInt(result[3], 16)
+            ] : [0, 0, 0];
+        }
+
+        function rgbToHsl(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+
+            if (max === min) {
+                h = s = 0;
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r:
+                        h = (g - b) / d + (g < b ? 6 : 0);
+                        break;
+                    case g:
+                        h = (b - r) / d + 2;
+                        break;
+                    case b:
+                        h = (r - g) / d + 4;
+                        break;
+                }
+                h /= 6;
+            }
+
+            return [h * 360, s, l];
+        }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+
+            h /= 360;
+
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1 / 6) return p + (q - p) * 6 * t;
+                    if (t < 1 / 2) return q;
+                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                    return p;
+                };
+
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+            }
+
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+        }
+
+        function getMoodColor(moodObj) {
+            return document.body.classList.contains('dark-mode') ? moodObj.darkColor : moodObj.color;
+        }
+
+        function calculateBlendedColor(selectedMoodIds, isDarkMode) {
+            if (!selectedMoodIds || selectedMoodIds.length === 0) {
+                return isDarkMode ? '#6b7280' : '#d1d5db';
+            }
+
+            if (selectedMoodIds.length === 1) {
+                const singleMood = singleMoods.find(m => m.id === selectedMoodIds[0]);
+                return singleMood ? (isDarkMode ? singleMood.darkColor : singleMood.color) : (isDarkMode ? '#6b7280' : '#d1d5db');
+            }
+
+            let totalR = 0;
+            let totalG = 0;
+            let totalB = 0;
+            let validMoodsCount = 0;
+
+            selectedMoodIds.forEach(moodId => {
+                const mood = allMoods.find(m => m.id === moodId);
+                if (mood) {
+                    const colorHex = isDarkMode ? mood.darkColor : mood.color;
+                    const [r, g, b] = hexToRgb(colorHex);
+                    totalR += r;
+                    totalG += g;
+                    totalB += b;
+                    validMoodsCount++;
+                }
+            });
+
+            if (validMoodsCount === 0) {
+                return isDarkMode ? '#6b7280' : '#d1d5db';
+            }
+
+            const avgR = totalR / validMoodsCount;
+            const avgG = totalG / validMoodsCount;
+            const avgB = totalB / validMoodsCount;
+
+            // Convert averaged RGB to HSL
+            let [h, s, l] = rgbToHsl(avgR, avgG, avgB);
+
+            // Now, adjust saturation and lightness to force a "pastel" look
+            // but still allow the original color blend to influence the output.
+            if (isDarkMode) {
+                // For dark mode, ensure colors are vibrant enough to "light up"
+                s = Math.min(Math.max(s, 0.4), 0.7); // Ensure a reasonable saturation for brightness
+                l = Math.min(Math.max(l, 0.5), 0.85); // Keep it relatively bright for dark mode
+            } else {
+                // For light mode, keep them softer pastel
+                s = Math.min(Math.max(s, 0.2), 0.5); // Slightly desaturated for light mode pastel
+                l = Math.min(Math.max(l, 0.8), 0.95); // Lighter for light mode pastel
+            }
+
+            // Convert back to RGB and then Hex
+            const [r, g, b] = hslToRgb(h, s, l);
+            return rgbToHex(r, g, b);
+        }
+
+        function getStarColor(selectedMoodIds) {
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            return calculateBlendedColor(selectedMoodIds, isDarkMode);
+        }
+
+        const jarThemes = [
+            {
+                id: 'default-blue',
+                label: 'Default Blue',
+                light: {
+                    bg: '#ffffff', text: '#1f2937', border: '#e5e7eb', primaryBgLight: '#f3f4f6',
+                    jarBorder: '#c7d2fe', jarText: '#374151', jarHeaderBg: '#eef2ff', jarHeaderBtn: '#9ca3af',
+                    addButtonBg: '#4f46e5', addButtonText: '#ffffff',
+                    capBg: '#E0E7FF', capBorder: '#9BB8FF', capText: '#4338CA'
+                },
+                dark: {
+                    bg: '#1f2937', text: '#e5e7eb', border: '#374151', primaryBgLight: '#374151',
+                    jarBorder: '#4f46e5', jarText: '#d1d5db', jarHeaderBg: '#374151', jarHeaderBtn: '#9ca3af',
+                    addButtonBg: '#818cf8', addButtonText: '#ffffff',
+                    capBg: '#3B82F6', capBorder: '#60A5FA', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'peachy-pink',
+                label: 'Peachy Pink',
+                light: {
+                    bg: '#FFFAFA', text: '#6A052D', border: '#FFD1DC', primaryBgLight: '#FCEAEA',
+                    jarBorder: '#FFC0CB', jarText: '#6A052D', jarHeaderBg: '#FFECEC', jarHeaderBtn: '#DDA0DD',
+                    addButtonBg: '#FF69B4', addButtonText: '#ffffff',
+                    capBg: '#FFDDCF', capBorder: '#FFB3A6', capText: '#B22222'
+                },
+                dark: {
+                    bg: '#331A21', text: '#F8BBD0', border: '#4A142F', primaryBgLight: '#4A142F',
+                    jarBorder: '#E91E63', jarText: '#F8BBD0', jarHeaderBg: '#4A142F', jarHeaderBtn: '#F48FB1',
+                    addButtonBg: '#FF4081', addButtonText: '#ffffff',
+                    capBg: '#CD5C5C', capBorder: '#E9967A', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'warm-orange',
+                label: 'Warm Orange',
+                light: {
+                    bg: '#FFFBF5', text: '#8B4513', border: '#FFD700', primaryBgLight: '#FFF0D9',
+                    jarBorder: '#FFD700', jarText: '#8B4513', jarHeaderBg: '#FFF8DC', jarHeaderBtn: '#DAA520',
+                    addButtonBg: '#FF8C00', addButtonText: '#ffffff',
+                    capBg: '#FFE4B5', capBorder: '#FFDAB9', capText: '#CD853F'
+                },
+                dark: {
+                    bg: '#33271A', text: '#FFECB3', border: '#6B3E0C', primaryBgLight: '#6B3E0C',
+                    jarBorder: '#FFA500', jarText: '#FFECB3', jarHeaderBg: '#6B3E0C', jarHeaderBtn: '#FFB74D',
+                    addButtonBg: '#FF7043', addButtonText: '#ffffff',
+                    capBg: '#FF6347', capBorder: '#FFA07A', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'earthy-brown',
+                label: 'Earthy Brown',
+                light: {
+                    bg: '#FDF8F0', text: '#4A2312', border: '#D2B48C', primaryBgLight: '#F8E0BF',
+                    jarBorder: '#A0522D', jarText: '#4A2312', jarHeaderBg: '#F5DEB3', jarHeaderBtn: '#8B4513',
+                    addButtonBg: '#CD853F', addButtonText: '#ffffff',
+                    capBg: '#D2B48C', capBorder: '#B8860B', capText: '#8B4513'
+                },
+                dark: {
+                    bg: '#26160A', text: '#D2B48C', border: '#361F0E', primaryBgLight: '#361F0E',
+                    jarBorder: '#8B4513', jarText: '#D2B48C', jarHeaderBg: '#361F0E', jarHeaderBtn: '#A0522D',
+                    addButtonBg: '#A0522D', addButtonText: '#ffffff',
+                    capBg: '#6B4226', capBorder: '#8B5A2B', capText: '#F5DEB3'
+                }
+            },
+            {
+                id: 'greenish',
+                label: 'Greenish',
+                light: {
+                    bg: '#F5FFF5', text: '#33691E', border: '#A5D6A7', primaryBgLight: '#E8F5E9',
+                    jarBorder: '#8BC34A', jarText: '#33691E', jarHeaderBg: '#DCEDC8', jarHeaderBtn: '#689F38',
+                    addButtonBg: '#4CAF50', addButtonText: '#ffffff',
+                    capBg: '#C8E6C9', capBorder: '#A5D6A7', capText: '#4CAF50'
+                },
+                dark: {
+                    bg: '#1B5E20', text: '#DCEDC8', border: '#2E7D32', primaryBgLight: '#2E7D32',
+                    jarBorder: '#689F38', jarText: '#DCEDC8', jarHeaderBg: '#2E7D32', jarHeaderBtn: '#8BC34A',
+                    addButtonBg: '#66BB6A', addButtonText: '#ffffff',
+                    capBg: '#388E3C', capBorder: '#66BB6A', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'lavender',
+                label: 'Lavender',
+                light: {
+                    bg: '#F9F6FE', text: '#4527A0', border: '#D1C4E9', primaryBgLight: '#F3E5F5',
+                    jarBorder: '#9575CD', jarText: '#4527A0', jarHeaderBg: '#EDE7F6', jarHeaderBtn: '#7E57C2',
+                    addButtonBg: '#673AB7', addButtonText: '#ffffff',
+                    capBg: '#D1C4E9', capBorder: '#B39DDB', capText: '#5E35B1'
+                },
+                dark: {
+                    bg: '#1A0D3E', text: '#EDE7F6', border: '#311B92', primaryBgLight: '#311B92',
+                    jarBorder: '#673AB7', jarText: '#EDE7F6', jarHeaderBg: '#311B92', jarHeaderBtn: '#9575CD',
+                    addButtonBg: '#7E57C2', addButtonText: '#ffffff',
+                    capBg: '#5E35B1', capBorder: '#7E57C2', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'coral-red',
+                label: 'Coral Red',
+                light: {
+                    bg: '#FFF5F5', text: '#D32F2F', border: '#FFCDD2', primaryBgLight: '#FFEBEA',
+                    jarBorder: '#FF7043', jarText: '#D32F2F', jarHeaderBg: '#FFCDD2', jarHeaderBtn: '#E53935',
+                    addButtonBg: '#F44336', addButtonText: '#ffffff',
+                    capBg: '#FFC0CB', capBorder: '#FF8A8A', capText: '#D32F2F'
+                },
+                dark: {
+                    bg: '#420A0A', text: '#FFCDD2', border: '#B71C1C', primaryBgLight: '#B71C1C',
+                    jarBorder: '#D32F2F', jarText: '#FFCDD2', jarHeaderBg: '#B71C1C', jarHeaderBtn: '#F44336',
+                    addButtonBg: '#E53935', addButtonText: '#ffffff',
+                    capBg: '#C62828', capBorder: '#D32F2F', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'soft-green',
+                label: 'Soft Green',
+                light: {
+                    bg: '#F8FFF8', text: '#388E3C', border: '#C8E6C9', primaryBgLight: '#F0F8EE',
+                    jarBorder: '#A5D6A7', jarText: '#388E3C', jarHeaderBg: '#E8F5E9', jarHeaderBtn: '#66BB6A',
+                    addButtonBg: '#4CAF50', addButtonText: '#ffffff',
+                    capBg: '#C8E6C9', capBorder: '#A5D6A7', capText: '#388E3C'
+                },
+                dark: {
+                    bg: '#1A3E1B', text: '#E8F5E9', border: '#388E3C', primaryBgLight: '#388E3C',
+                    jarBorder: '#66BB6A', jarText: '#E8F5E9', jarHeaderBg: '#388E3C', jarHeaderBtn: '#A5D6A7',
+                    addButtonBg: '#4CAF50', addButtonText: '#ffffff',
+                    capBg: '#2E7D32', capBorder: '#4CAF50', capText: '#ffffff'
+                }
+            },
+            {
+                id: 'black-white',
+                label: 'Black & White',
+                light: {
+                    bg: '#FFFFFF', text: '#000000', border: '#E0E0E0', primaryBgLight: '#F0F0F0',
+                    jarBorder: '#333333', jarText: '#000000', jarHeaderBg: '#E0E0E0', jarHeaderBtn: '#666666',
+                    addButtonBg: '#000000', addButtonText: '#ffffff',
+                    capBg: '#B0B0B0', capBorder: '#808080', capText: '#000000'
+                },
+                dark: {
+                    bg: '#1f2937', text: '#e5e7eb', border: '#374151', primaryBgLight: '#303030',
+                    jarBorder: '#DDDDDD', jarText: '#FFFFFF', jarHeaderBg: '#404040', jarHeaderBtn: '#AAAAAA',
+                    addButtonBg: '#FFFFFF', addButtonText: '#000000',
+                    capBg: '#606060', capBorder: '#909090', capText: '#FFFFFF'
+                }
+            }
+        ];
+
+        function getMoodData() {
+            try {
+                const data = localStorage.getItem('moodTrackerData');
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                console.error("Error parsing mood data from localStorage", e);
+                return {};
+            }
+        }
+
+        function saveMoodData(data) {
+            try {
+                localStorage.setItem('moodTrackerData', JSON.stringify(data));
+            } catch (e) {
+                console.error("Error saving mood data to localStorage", e);
+            }
+        }
+
+        function getSettings() {
+            try {
+                const settings = localStorage.getItem('moodTrackerSettings');
+                return settings ? JSON.parse(settings) : { theme: 'light', jarTheme: 'default-blue' };
+            } catch (e) {
+                console.error("Error parsing settings from localStorage", e);
+                return { theme: 'light', jarTheme: 'default-blue' };
+            }
+        }
+
+        function saveSettings(settings) {
+            try {
+                localStorage.setItem('moodTrackerSettings', JSON.stringify(settings));
+            } catch (e) {
+                console.error("Error saving settings to localStorage", e);
+            }
+        }
+
+        function loadSettings() {
+            const settings = getSettings(); // This gets the saved settings
+            if (settings.theme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+            // Use the jarTheme from the loaded settings
+            applyJarTheme(settings.jarTheme, settings.theme === 'dark');
+        }
+
+        function applyJarTheme(themeId, isDarkMode) {
+            const selectedTheme = jarThemes.find(theme => theme.id === themeId);
+            if (!selectedTheme) return;
+
+            const root = document.documentElement;
+            const colors = isDarkMode ? selectedTheme.dark : selectedTheme.light;
+
+            // These general theme colors are always set
+            root.style.setProperty('--bg-color', colors.bg);
+            root.style.setProperty('--text-color', colors.text);
+            root.style.setProperty('--border-color', colors.border);
+            root.style.setProperty('--primary-bg-light', colors.primaryBgLight);
+
+            // Explicitly set all jar-specific colors here.
+            // These properties are no longer defined with defaults in the CSS style block.
+            root.style.setProperty('--color-jarBorder', colors.jarBorder);
+            root.style.setProperty('--color-jarText', colors.jarText);
+            root.style.setProperty('--color-jarHeaderBg', colors.jarHeaderBg);
+            root.style.setProperty('--color-jarHeaderBtn', colors.jarHeaderBtn);
+            root.style.setProperty('--color-add-button-bg', colors.addButtonBg);
+            root.style.setProperty('--color-add-button-text', colors.addButtonText);
+            root.style.setProperty('--color-cap-bg', colors.capBg);
+            root.style.setProperty('--color-cap-border', colors.capBorder);
+            root.style.setProperty('--color-cap-text', colors.capText);
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const moodStarsContainer = document.getElementById('mood-stars-container');
+            const currentMonthYearDisplay = document.getElementById('current-month-year');
+            const prevMonthBtn = document.getElementById('prev-month');
+            const nextMonthBtn = document.getElementById('next-month');
+            const addMoodBtnHeader = document.getElementById('add-mood-btn-header');
+            const settingsBtn = document.getElementById('settings-btn');
+            const emptyJarMessage = document.getElementById('empty-jar-message');
+            const currentMoodDisplay = document.getElementById('current-mood-display');
+            const headerCurrentDateDisplay = document.getElementById('header-current-date');
+            const jarCapText = document.getElementById('jar-cap-text');
+
+            const moodSelectionModalOverlay = document.getElementById('mood-selection-modal-overlay');
+            const closeMoodModalBtn = document.getElementById('close-mood-modal-btn');
+            const moodSelectorList = document.getElementById('mood-selector-list');
+            const saveMoodBtn = document.getElementById('save-mood-btn');
+            const clearMoodBtn = document.getElementById('clear-mood-btn');
+
+            const settingsModalOverlay = document.getElementById('settings-modal-overlay');
+            const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
+            const toggleDarkModeBtn = document.getElementById('toggle-dark-mode');
+            const jarThemeSelector = document.getElementById('jar-theme-selector');
+
+            let currentCalendarDate = new Date(); // Represents the month currently being viewed
+
+            // Load settings and apply initial theme
+            loadSettings();
+
+            const today = new Date();
+            headerCurrentDateDisplay.textContent = today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+            // Initial render of mood stars and cap quote after a slight delay to allow CSS to load
+            setTimeout(() => {
+                renderMoodStars(currentCalendarDate);
+                updateJarCapQuote();
+            }, 100);
+
+            prevMonthBtn.addEventListener('click', () => {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+                renderMoodStars(currentCalendarDate);
+                updateJarCapQuote(); // Update quote as the displayed month changes
+            });
+
+            nextMonthBtn.addEventListener('click', () => {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+                renderMoodStars(currentCalendarDate);
+                updateJarCapQuote(); // Update quote as the displayed month changes
+            });
+
+            addMoodBtnHeader.addEventListener('click', () => {
+                openMoodSelectionModal();
+            });
+
+            closeMoodModalBtn.addEventListener('click', closeMoodSelectionModal);
+            moodSelectionModalOverlay.addEventListener('click', (e) => {
+                if (e.target === moodSelectionModalOverlay) {
+                    closeMoodSelectionModal();
+                }
+            });
+            saveMoodBtn.addEventListener('click', saveSelectedMoods);
+            clearMoodBtn.addEventListener('click', clearMoodForToday);
+
+            settingsBtn.addEventListener('click', openSettingsModal);
+            closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+            settingsModalOverlay.addEventListener('click', (e) => {
+                if (e.target === settingsModalOverlay) {
+                    closeSettingsModal();
+                }
+            });
+            toggleDarkModeBtn.addEventListener('click', toggleDarkMode);
+
+            window.addEventListener('resize', () => {
+                // Re-render stars to adjust positions on resize
+                renderMoodStars(currentCalendarDate);
+            });
+
+            function openMoodSelectionModal() {
+                moodSelectionModalOverlay.classList.add('open');
+                moodSelectorList.innerHTML = '';
+
+                const todayKey = formatDate(new Date());
+                const moodData = getMoodData();
+                const previouslySelectedMoods = moodData[todayKey] ? moodData[todayKey].moodIds : [];
+
+                allMoods.forEach(mood => {
+                    const moodItem = document.createElement('div');
+                    const moodBgColor = getMoodColor(mood);
+                    const isSelected = previouslySelectedMoods.includes(mood.id);
+
+                    moodItem.className = `mood-selector-button p-2 rounded-md cursor-pointer flex items-center transition-colors duration-150 ${isSelected ? 'selected' : ''}`;
+                    moodItem.style.backgroundColor = moodBgColor;
+
+                    // Determine text color based on background luminance for readability
+                    const hexColor = moodBgColor.startsWith('#') ? moodBgColor.substring(1) : moodBgColor;
+                    const r = parseInt(hexColor.substring(0, 2), 16);
+                    const g = parseInt(hexColor.substring(2, 4), 16);
+                    const b = parseInt(hexColor.substring(4, 6), 16);
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    moodItem.style.color = luminance > 0.5 ? '#1f2937' : '#f3f4f6';
+
+                    moodItem.dataset.moodId = mood.id;
+                    moodItem.innerHTML = `
+                        <div class="flex items-center w-full">
+                            <span class="mr-2">${mood.label}</span>
+                            ${isSelected ? '<i class="fas fa-check ml-auto"></i>' : ''}
+                        </div>
+                    `;
+
+                    moodItem.addEventListener('click', () => {
+                        moodItem.classList.toggle('selected');
+                        const checkIcon = moodItem.querySelector('.fa-check');
+                        if (moodItem.classList.contains('selected')) {
+                            if (!checkIcon) {
+                                const icon = document.createElement('i');
+                                icon.className = 'fas fa-check ml-auto';
+                                moodItem.querySelector('div').appendChild(icon);
+                            }
+                        } else {
+                            if (checkIcon) {
+                                checkIcon.remove();
+                            }
+                        }
+                    });
+                    moodSelectorList.appendChild(moodItem);
+                });
+            }
+
+            function closeMoodSelectionModal() {
+                moodSelectionModalOverlay.classList.remove('open');
+                currentMoodDisplay.textContent = ''; // Clear confirmation message
+            }
+
+            function saveSelectedMoods() {
+                const today = new Date();
+                const todayKey = formatDate(today);
+                const moodData = getMoodData();
+
+                const selectedElements = moodSelectorList.querySelectorAll('.mood-selector-button.selected');
+                const selectedMoodIds = Array.from(selectedElements).map(el => el.dataset.moodId);
+
+                if (selectedMoodIds.length > 0) {
+                    const finalColor = getStarColor(selectedMoodIds);
+                    // Store timestamp to differentiate older vs. newer stars
+                    moodData[todayKey] = { moodIds: selectedMoodIds, color: finalColor, timestamp: new Date().toISOString() };
+                    playMoodSound();
+                } else {
+                    delete moodData[todayKey];
+                }
+                saveMoodData(moodData);
+                renderMoodStars(currentCalendarDate);
+                updateJarCapQuote();
+                closeMoodSelectionModal();
+
+                const moodLabel = selectedMoodIds.length > 0
+                    ? selectedMoodIds.map(id => allMoods.find(m => m.id === id)?.label || '').filter(Boolean).join(', ')
+                    : 'Mood Cleared';
+                currentMoodDisplay.textContent = `Today's Mood: ${moodLabel}`;
+                currentMoodDisplay.classList.add('mood-selected-confirmation');
+                currentMoodDisplay.addEventListener('animationend', () => {
+                    currentMoodDisplay.classList.remove('mood-selected-confirmation');
+                    currentMoodDisplay.textContent = '';
+                }, { once: true });
+            }
+
+            function clearMoodForToday() {
+                const today = new Date();
+                const todayKey = formatDate(today);
+                const moodData = getMoodData();
+
+                if (moodData[todayKey]) {
+                    delete moodData[todayKey];
+                    saveMoodData(moodData);
+                    renderMoodStars(currentCalendarDate);
+                    updateJarCapQuote();
+                    closeMoodSelectionModal();
+
+                    currentMoodDisplay.textContent = `Today's Mood: Cleared`;
+                    currentMoodDisplay.classList.add('mood-selected-confirmation');
+                    currentMoodDisplay.addEventListener('animationend', () => {
+                        currentMoodDisplay.classList.remove('mood-selected-confirmation');
+                        currentMoodDisplay.textContent = '';
+                    }, { once: true });
+                    playMoodSound();
+                } else {
+                    closeMoodSelectionModal();
+                }
+            }
+
+            function updateJarCapQuote() {
+                // Only update quote if viewing the current month
+                const today = new Date();
+                const isCurrentMonth = today.getMonth() === currentCalendarDate.getMonth() &&
+                                       today.getFullYear() === currentCalendarDate.getFullYear();
+
+                let quoteToDisplay;
+                if (isCurrentMonth) {
+                    const todayKey = formatDate(today);
+                    const moodData = getMoodData();
+                    const todayMoodEntry = moodData[todayKey];
+
+                    if (todayMoodEntry && todayMoodEntry.moodIds.length > 0) {
+                        quoteToDisplay = getQuoteForMoods(todayMoodEntry.moodIds);
+                    } else {
+                        quoteToDisplay = "How are you feeling today?";
+                    }
+                } else {
+                    quoteToDisplay = "Reflecting on past moods...";
+                }
+                jarCapText.textContent = quoteToDisplay;
+            }
+
+
+            function renderMoodStars(date) {
+                currentMonthYearDisplay.textContent = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                moodStarsContainer.innerHTML = ''; // Clear existing stars
+
+                const moodData = getMoodData();
+                const today = new Date();
+                const currentMonth = date.getMonth();
+                const currentYear = date.getFullYear();
+
+                // Filter moods for the currently displayed month
+                const moodsForMonth = Object.keys(moodData)
+                    .filter(dateKey => {
+                        const moodDate = new Date(dateKey);
+                        return moodDate.getMonth() === currentMonth && moodDate.getFullYear() === currentYear;
+                    })
+                    .map(dateKey => ({
+                        date: new Date(dateKey),
+                        moodIds: moodData[dateKey].moodIds,
+                        color: moodData[dateKey].color,
+                        timestamp: moodData[dateKey].timestamp ? new Date(moodData[dateKey].timestamp) : new Date(dateKey) // Use timestamp or date as fallback
+                    }))
+                    .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp for brightness/sinking effect
+
+                let moodsExistThisMonth = moodsForMonth.length > 0;
+
+                if (!moodsExistThisMonth) {
+                    emptyJarMessage.style.display = 'block';
+                } else {
+                    emptyJarMessage.style.display = 'none';
+
+                    // Ensure there's enough space for all stars to distribute vertically
+                    // Max 31 days in a month. Each star 18px + some padding.
+                    // If the container height is too small, stars will overlap.
+                    const minContainerHeight = moodsForMonth.length * 25; // Estimate needed height
+                    moodStarsContainer.style.minHeight = `${Math.max(200, minContainerHeight)}px`; // Ensure it's at least 200px
+
+                    moodsForMonth.forEach((moodEntry, index) => {
+                        const starElement = document.createElement('div');
+                        starElement.className = `star-mood-item`;
+                        starElement.style.backgroundColor = moodEntry.color;
+
+                        const containerWidth = moodStarsContainer.offsetWidth;
+                        const containerHeight = moodStarsContainer.offsetHeight;
+                        const starSize = 18;
+
+                        // Calculate brightness/opacity based on recency
+                        const totalMoods = moodsForMonth.length;
+                        const recencyFactor = (index + 1) / totalMoods; // 0 for oldest, 1 for newest
+                        // Apply recency to opacity. Newer stars (higher index) are brighter.
+                        const opacity = 0.5 + (recencyFactor * 0.5); // Ranges from 0.5 to 1.0
+                        starElement.style.opacity = opacity;
+
+                        // Calculate vertical position (sinking effect)
+                        // Newer stars should be higher, older stars lower
+                        // Use a fixed padding from the bottom and then distribute based on index
+                        const bottomPadding = 10; // Padding from the bottom of the jar
+                        const verticalSpacing = (containerHeight - bottomPadding - starSize) / (totalMoods > 1 ? totalMoods - 1 : 1);
+                        const topPosition = containerHeight - bottomPadding - starSize - (index * verticalSpacing);
+
+                        // Horizontal position randomness
+                        const randomLeft = Math.random() * (containerWidth - starSize);
+
+                        starElement.style.left = `${randomLeft}px`;
+                        starElement.style.top = `${topPosition}px`; // Apply calculated vertical position
+
+
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'tooltip';
+                        const moodLabels = moodEntry.moodIds
+                            .map(id => allMoods.find(m => m.id === id)?.label || '')
+                            .filter(Boolean)
+                            .join(', ');
+                        tooltip.textContent = `${moodEntry.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${moodLabels}`;
+                        starElement.appendChild(tooltip);
+
+                        moodStarsContainer.appendChild(starElement);
+                    });
+                }
+                updateJarCapQuote(); // Ensure quote is updated after rendering stars
+            }
+
+            function openSettingsModal() {
+                settingsModalOverlay.classList.add('open');
+                renderJarThemeSelector(); // This will now always ensure the selector is correctly rendered when opened
+            }
+
+            function closeSettingsModal() {
+                settingsModalOverlay.classList.remove('open');
+            }
+
+            function toggleDarkMode() {
+                const settings = getSettings();
+                settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
+                saveSettings(settings);
+                loadSettings(); // This will re-apply the correct jar theme and dark mode class
+                renderMoodStars(currentCalendarDate); // Re-render stars with new colors/glows
+                // renderJarThemeSelector() is intentionally not called here.
+                // It will be called when the settings modal is opened, ensuring its state is consistent then.
+            }
+
+            function renderJarThemeSelector() {
+                jarThemeSelector.innerHTML = '';
+                const currentSettings = getSettings();
+                const isDarkMode = document.body.classList.contains('dark-mode');
+
+                jarThemes.forEach(theme => {
+                    const themeButton = document.createElement('button');
+                    themeButton.className = `color-palette-button flex items-center justify-center relative group`; // Added group for tooltip
+                    themeButton.dataset.themeId = theme.id;
+
+                    // Use the correct preview color based on the current dark mode state
+                    const previewColor = isDarkMode ? theme.dark.jarBorder : theme.light.jarBorder;
+                    themeButton.style.backgroundColor = previewColor;
+
+                    if (currentSettings.jarTheme === theme.id) {
+                        themeButton.classList.add('selected-palette');
+                    }
+
+                    const tooltipSpan = document.createElement('span');
+                    tooltipSpan.textContent = theme.label;
+                    tooltipSpan.className = 'absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity duration-200 pointer-events-none group-hover:opacity-100';
+                    themeButton.appendChild(tooltipSpan);
+
+                    const innerCircle = document.createElement('div');
+                    innerCircle.style.width = '60%';
+                    innerCircle.style.height = '60%';
+                    innerCircle.style.borderRadius = '50%';
+                    // Inner circle color should also adapt to the selected theme's dark/light mode properties
+                    innerCircle.style.backgroundColor = isDarkMode ? theme.dark.jarHeaderBg : theme.light.jarHeaderBg;
+                    innerCircle.style.border = `1px solid ${isDarkMode ? theme.dark.jarText : theme.light.jarText}`;
+                    themeButton.appendChild(innerCircle);
+
+                    themeButton.addEventListener('click', () => {
+                        currentSettings.jarTheme = theme.id;
+                        saveSettings(currentSettings);
+                        // When applying theme from selector, use the *current* dark mode status
+                        applyJarTheme(theme.id, document.body.classList.contains('dark-mode'));
+                        renderJarThemeSelector(); // Re-render selector to update selected state
+                        renderMoodStars(currentCalendarDate); // Re-render stars with new jar theme colors
+                        updateJarCapQuote(); // Update quote to reflect new theme's text color if applicable
+                    });
+                    jarThemeSelector.appendChild(themeButton);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
